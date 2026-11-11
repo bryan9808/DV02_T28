@@ -1,3 +1,77 @@
+/* Colour tokens: change once here and every chart follows */
+:root {
+  --ink: #1f2a33;      /* text */
+  --muted: #5b6770;    /* secondary text, axes */
+  --line: #1d5f8a;     /* main data colour (blue) */
+  --accent: #c2410c;   /* increases, highlights, annotations (orange) */
+  --caveat: #8fb1c9;   /* lighter blue: figures with a known data caveat (e.g. NSW) */
+  --grid: #e3e7ea;
+  --bg: #ffffff;
+}
+
+* { box-sizing: border-box; }
+
 body {
-  background-color: red;
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1.05rem;
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.55;
+}
+
+.intro, main, .credits { max-width: 920px; margin: 0 auto; padding: 0 1.25rem; }
+.intro { padding-top: 3rem; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1.15; margin: 0 0 .5rem; }
+.lede { max-width: 62ch; color: var(--muted); }
+h2 { font-size: 1.45rem; margin: 3.5rem 0 .75rem; }
+h3 { font-size: 1.1rem; margin: 1.75rem 0 .5rem; }
+.note { color: var(--muted); font-size: .95rem; max-width: 70ch; }
+.credits { color: var(--muted); font-size: .85rem; padding-top: 3rem; padding-bottom: 2rem; }
+
+/* Charts scale with the page because each SVG uses a viewBox */
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.axis text { font-size: 12px; fill: var(--muted); }
+.axis-y text { font-size: 13px; fill: var(--ink); }
+.axis path, .axis line { stroke: var(--muted); }
+.axis-y path { display: none; }
+.grid line { stroke: var(--grid); }
+.grid path { display: none; }
+.axis-label { font-size: 13px; fill: var(--muted); }
+.annotation { font-size: 12px; fill: var(--accent); }
+.value { font-size: 12px; fill: var(--ink); }
+.seg-label { font-size: 13px; fill: #ffffff; font-weight: 600; pointer-events: none; }
+
+/* Toggle buttons and legend */
+.toggle, .legend { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }
+.toggle button, .legend button {
+  font: inherit; font-size: .9rem;
+  padding: .35rem .8rem;
+  border: 1px solid var(--muted);
+  border-radius: 999px;
+  background: #fff; color: var(--ink);
+  cursor: pointer;
+}
+.toggle button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.legend button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.swatch { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; margin-right: .4rem; vertical-align: -1px; }
+
+/* Visible keyboard focus everywhere */
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.chart [tabindex]:focus { outline: none; stroke: var(--ink); stroke-width: 2.5; }
+
+.tooltip {
+  position: absolute; z-index: 10;
+  pointer-events: none;
+  max-width: 260px;
+  background: var(--ink); color: #fff;
+  padding: .45rem .65rem;
+  border-radius: 4px;
+  font-size: .85rem; line-height: 1.4;
+}
+.tip-muted { color: #c9d3da; }
+
+@media (max-width: 600px) {
+  h2 { margin-top: 2.5rem; }
+  .axis-y text { font-size: 15px; }
 }
