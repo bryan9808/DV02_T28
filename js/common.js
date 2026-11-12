@@ -102,3 +102,43 @@ const DV = (() => {
 
   return { fmtInt, fmt1, duration, createSvg, addTooltip, setupToggle, switchableBarChart };
 })();
+
+document.addEventListener("DOMContentLoaded", () => {
+  const sections = document.querySelectorAll(".question-section");
+  const navLinks = document.querySelectorAll(".nav-link");
+  const progressBar = document.getElementById("scrollProgress");
+
+  // 1. Highlight active section in navbar on scroll
+  const observerOptions = {
+    root: null,
+    // Triggers when a section crosses the upper-middle portion of the viewport
+    rootMargin: "-20% 0px -65% 0px",
+    threshold: 0
+  };
+
+  const sectionObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        const currentId = entry.target.getAttribute("id");
+        navLinks.forEach((link) => {
+          link.classList.toggle(
+            "active",
+            link.getAttribute("href") === `#${currentId}`
+          );
+        });
+      }
+    });
+  }, observerOptions);
+
+  sections.forEach((section) => sectionObserver.observe(section));
+
+  // 2. Update bottom progress bar
+  window.addEventListener("scroll", () => {
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const scrollPercent = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+    if (progressBar) {
+      progressBar.style.width = `${scrollPercent}%`;
+    }
+  }, { passive: true });
+});

@@ -8,19 +8,38 @@
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 </head>
 <body>
+
+  <!-- Sticky Top Navbar -->
+  <nav class="navbar" aria-label="Section navigation">
+    <div class="nav-inner">
+      <a href="#" class="nav-brand">Road Injuries AU</a>
+      <ul class="nav-links">
+        <li><a href="#q1-section" class="nav-link active">Trend</a></li>
+        <li><a href="#q2-section" class="nav-link">Road users</a></li>
+        <li><a href="#q3-section" class="nav-link">Counterparty</a></li>
+        <li><a href="#q4-section" class="nav-link">Jurisdictions</a></li>
+        <li><a href="#q5-section" class="nav-link">Age &amp; remoteness</a></li>
+      </ul>
+    </div>
+    <!-- Bottom reading progress bar -->
+    <div class="scroll-progress" id="scrollProgress"></div>
+  </nav>
+
   <header class="intro">
     <h1>Who gets hurt and where</h1>
     <p class="lede">Hospitalised road crash injuries in Australia, 2011–2021. Each year, tens of thousands of people survive a road crash but are admitted to hospital. This story looks at who they are, what they collided with, and where they live.</p>
   </header>
 
   <main>
-    <section id="q1-section" aria-labelledby="q1-title">
+    <!-- Question 1 Section -->
+    <section id="q1-section" class="question-section question-card" aria-labelledby="q1-title">
       <h2 id="q1-title">How many people are hospitalised each year?</h2>
       <div id="q1" class="chart"></div>
       <p class="note">Dashed lines mark changes in how Victoria (2012) and New South Wales (2017) counted admissions, so drops at these points are partly due to counting, not fewer injuries.</p>
     </section>
 
-    <section id="q2-section" aria-labelledby="q2-title">
+    <!-- Question 2 Section -->
+    <section id="q2-section" class="question-section question-card" aria-labelledby="q2-title">
       <h2 id="q2-title">Who is injured?</h2>
       <div id="q2-toggle" class="toggle" role="group" aria-label="Choose measure">
         <button type="button" data-value="abs" aria-pressed="true">Number of people</button>
@@ -30,14 +49,16 @@
       <p class="note">Orange bars show road users with more hospitalisations in 2021 than in 2017; blue bars show fewer. Both years come after the reporting changes, so they can be compared.</p>
     </section>
 
-    <section id="q3-section" aria-labelledby="q3-title">
+    <!-- Question 3 Section -->
+    <section id="q3-section" class="question-section question-card" aria-labelledby="q3-title">
       <h2 id="q3-title">What did they collide with?</h2>
       <div id="q3-legend" class="legend" role="group" aria-label="Highlight a counterparty"></div>
       <div id="q3" class="chart"></div>
       <p class="note">2017–2021 combined. “Non-collision” means no other vehicle, person or object was recorded, for example falling from a bike; it does not tell us the cause. “Unspecified” cases could not be classified.</p>
     </section>
 
-    <section id="q4-section" aria-labelledby="q4-title">
+    <!-- Question 4 Section -->
+    <section id="q4-section" class="question-section question-card" aria-labelledby="q4-title">
       <h2 id="q4-title">Where are people hospitalised?</h2>
       <div id="q4-toggle" class="toggle" role="group" aria-label="Choose measure">
         <button type="button" data-value="count" aria-pressed="true">Number of people</button>
@@ -47,18 +68,25 @@
       <p class="note">State is where the person was treated in hospital. *NSW is shown in a lighter shade because, since 2017, it no longer counts cases treated only in emergency departments, which lowers its figures.</p>
     </section>
 
-    <section id="q5-section" aria-labelledby="q5-title">
+    <!-- Question 5 Section -->
+    <section id="q5-section" class="question-section question-card" aria-labelledby="q5-title">
       <h2 id="q5-title">Who is most at risk?</h2>
-      <h3>By age group</h3>
-      <div id="q5-age" class="chart"></div>
-      <p class="note">Age groups cover different numbers of years (40–64 spans 25 years, 0–7 only 8), so wider groups naturally include more people.</p>
-      <h3>By where people live</h3>
-      <div id="q5-toggle" class="toggle" role="group" aria-label="Choose measure">
-        <button type="button" data-value="count" aria-pressed="true">Number of people</button>
-        <button type="button" data-value="rate" aria-pressed="false">Per 100,000 people</button>
+      
+      <div class="sub-block">
+        <h3>By age group</h3>
+        <div id="q5-age" class="chart"></div>
+        <p class="note">Age groups cover different numbers of years (40–64 spans 25 years, 0–7 only 8), so wider groups naturally include more people.</p>
       </div>
-      <div id="q5-remote" class="chart"></div>
-      <p class="note">Remoteness is based on where the person usually lives, not where the crash happened. 629 cases with unknown residence are not included.</p>
+
+      <div class="sub-block">
+        <h3>By where people live</h3>
+        <div id="q5-toggle" class="toggle" role="group" aria-label="Choose measure">
+          <button type="button" data-value="count" aria-pressed="true">Number of people</button>
+          <button type="button" data-value="rate" aria-pressed="false">Per 100,000 people</button>
+        </div>
+        <div id="q5-remote" class="chart"></div>
+        <p class="note">Remoteness is based on where the person usually lives, not where the crash happened. 629 cases with unknown residence are not included.</p>
+      </div>
     </section>
   </main>
 
