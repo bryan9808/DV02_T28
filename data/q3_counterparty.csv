@@ -1,0 +1,29 @@
+"road_user","counterparty","hospitalisations","user_total","share_pct"
+"Motorcyclist","2- or 3- wheeled motor vehicle",908,43853,2.070553895970629
+"Motorcyclist","Car, pick-up truck or van",11519,43853,26.267302123001844
+"Motorcyclist","Fixed or stationary object",4327,43853,9.867055845666203
+"Motorcyclist","Heavy transport vehicle or bus",419,43853,0.9554648484710281
+"Motorcyclist","Non-collision transport accident",18283,43853,41.69156044056279
+"Motorcyclist","Other and unspecified transport accidents",7194,43853,16.40480696873646
+"Motorcyclist","Other non-motor vehicle",57,43853,0.12997970492326635
+"Motorcyclist","Pedal cycle",77,43853,0.17558661893143002
+"Motorcyclist","Pedestrian or animal",1067,43853,2.43312886233553
+"Motorcyclist","Train",2,43853,0.004560691400816364
+"Pedal cyclist","2- or 3- wheeled motor vehicle",82,37832,0.21674772679213364
+"Pedal cyclist","Car, pick-up truck or van",7856,37832,20.765489532670756
+"Pedal cyclist","Fixed or stationary object",2221,37832,5.870691478113766
+"Pedal cyclist","Heavy transport vehicle or bus",251,37832,0.6634595051807993
+"Pedal cyclist","Non-collision transport accident",16798,37832,44.40156481285684
+"Pedal cyclist","Other and unspecified transport accidents",8328,37832,22.013110594205962
+"Pedal cyclist","Other non-motor vehicle",53,37832,0.14009304292662297
+"Pedal cyclist","Pedal cycle",1806,37832,4.7737365193487
+"Pedal cyclist","Pedestrian or animal",427,37832,1.1286741382956227
+"Pedal cyclist","Train",10,37832,0.026432649608796786
+"Pedestrian","2- or 3- wheeled motor vehicle",245,12525,1.9560878243512974
+"Pedestrian","Car, pick-up truck or van",11018,12525,87.96806387225548
+"Pedestrian","Heavy transport vehicle or bus",475,12525,3.792415169660679
+"Pedestrian","Other and unspecified transport accidents",367,12525,2.9301397205588824
+"Pedestrian","Other non-motor vehicle",57,12525,0.45508982035928147
+"Pedestrian","Pedal cycle",242,12525,1.9321357285429144
+"Pedestrian","Pedestrian or animal",72,12525,0.5748502994011976
+"Pedestrian","Train",49,12525,0.39121756487025944
