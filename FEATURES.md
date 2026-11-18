@@ -1,97 +1,71 @@
 # Features and verification guide
 
-This guide describes the current chart interactions, responsive behavior, accessibility support, and how to verify them manually.
+This guide describes the chart interactions, responsive behaviour and accessibility support, and how to check them manually.
 
 ## Data and chart scope
 
-The Q1 trend uses annual observations from 2011 through 2021. Q2 compares 2017 with 2021; Q3 aggregates counterparty data over 2017–2021; Q4 and the Q5 age/remoteness charts are 2021 views. Do not interpret the Q2–Q5 views as annual time series.
+Q1 uses annual totals for 2011–2021. Q2 compares two years (2017 and 2021 until `q2_road_users_by_year.csv` is exported). Q3 shows 2017–2021 combined (single years once `q3_counterparty_by_year.csv` is exported). Q4 and Q5 show 2021 (other years once their by-year files are exported). See README → *Enabling the full year filters*.
 
 ## Chart features
 
 ### Q1 — annual trend
-
-In the **Filter by Year / Period** selector, choose:
-
-- **All Years (2011–2021)**
-- **2011–2016** or **2017–2021**
-- An individual year from 2011 to 2021
-
-The KPI updates with the selected annual total and year-over-year percentage change. For a selected range, it shows the sum of annual observations and the percentage difference between the range’s first and last years. 2011 has no earlier year for a year-over-year comparison.
-
-The chart animates its axes, line, points, and reporting-change annotations. Move a pointer over the plot to show the crosshair and nearest year’s value. Check **Show 3-year moving average** to display the trailing average; the first two years do not have a three-year value.
+Choose **All Years**, **2011–2016**, **2017–2021** or a single year. The summary shows the total and the percentage change. The chart animates; a crosshair follows the pointer; **Show 3-year moving average** adds a trailing average. Dashed lines mark the VIC 2012 and NSW 2017 counting changes; the 2020 dip note says it *coincides* with COVID-19 restrictions.
 
 ### Q2 — road users
-
-Use the measure buttons to switch between the change in number of people and the change in share of hospitalisations (percentage points). Separately choose **Absolute Change** or **% Change** in the sort control. The bars, values, and accessible table follow the selected measure and ranking.
+- **Compare [year] with [year]** (appears when more than two years are available; with the current file it offers 2017 and 2021).
+- **View:** *Change* (diverging bars: yellow = more people, dark green = fewer) or *Before & after* (dumbbell: hollow circle = first year, filled = second).
+- **Measure:** number of people or share of all hospitalisations. **Sort by:** absolute or % change.
+- A caution note appears when the two years cross a reporting change.
 
 ### Q3 — counterparties
+- **View:** *Flow diagram* (Sankey; flow width = hospitalisations) or *Share bars* (100% stacked).
+- Legend buttons highlight one counterparty in either view; select again to clear.
+- Select a road user (its block on the left of the flow diagram, or any of its bar segments; Enter/Space on the keyboard) to open the detailed breakdown; **Close** dismisses it.
+- **Period** selector appears when `q3_counterparty_by_year.csv` is listed in the manifest.
 
-The 100% stacked bars show counterparty shares for motorcyclists, pedal cyclists, and pedestrians. Select a counterparty legend button to highlight that group, then select it again to restore all groups. Select a stacked segment—or, on a small touch screen, its full road-user row—to open the detailed count/share breakdown. Use **Close** to dismiss the breakdown.
+### Q4 — jurisdictions
+A **map of Australia** and **ranked bars** are shown together. In *Number of people* the map shows circles sized by count; in *Per 100,000 people* it shades each state by rate (darker = higher). Hover or focus a state in either view and it is outlined in both; bars re-sort when the measure changes. NSW is hatched (and marked NSW*) because of its 2017 counting change; the ACT is labelled offshore with a leader line. In rate view a dashed line on the bars shows the rate across all eight states and territories. **Year** selector appears with the by-year file.
 
-### Q4 — jurisdictions and Q5 — age/remoteness
+### Q5 — age and remoteness
+- **Age:** *Per year of age* shows a variable-width histogram (width = age range, height = average per year of age, area = people); *Total per age group* shows equal-width bars. The open-ended 75+ group is hatched and drawn as 75–89 for display only.
+- **Remoteness:** an isotype pictogram. The key states what one figure represents (e.g. 500 people, or 5 people per 100,000 residents); the unit is chosen so the rows fill the chart width. Partial figures show remainders. In *Per 100,000 people* a dashed line shows the rate across all areas. Each row is focusable and has a tooltip.
+- **Year** selector appears when both Q5 by-year files are listed.
 
-Q4 switches between 2021 counts and rates per 100,000 by state or territory. Q5 includes 2021 counts by age group and a switchable count/rate chart by remoteness. The national-average rate line appears in the rate views; the accessible tables also identify the reference value.
-
-## Responsive and touch behavior
-
-- At widths up to 768px, navigation and page layout adapt for tablets.
-- At widths up to 599px, the sticky navigation scrolls horizontally; charts scroll horizontally at their native SVG width to preserve text legibility.
-- Buttons, toggles, legend pills, filter controls, and Q3 touch rows have 44px-or-larger targets.
-- On touch screens, tap a data mark to pin its tooltip; tap elsewhere to dismiss it. Tooltip positioning is clamped to the viewport edges.
+## Responsive and touch behaviour
+- Each chart is drawn at the actual width of its card and redrawn when the width changes (`DV.responsive`). Pages never scroll sideways.
+- Under 560px chart width, charts switch to a phone layout: labels above bars, fewer and compact ticks (e.g. 13.0k), angled age labels, Sankey labels above/beside nodes with a white halo.
+- Under 768px, the hero, cards and Q4 views stack vertically.
+- Buttons, toggles, legend pills and selects are at least 44px high. On touch screens, tap a mark to pin its tooltip; tap elsewhere to dismiss it.
 
 ## Accessibility and how to test it
 
-### Skip link and landmarks
+### Automated check
+Run axe DevTools (or Lighthouse → Accessibility) on desktop and at 390px width: expect **no violations**.
 
-1. Reload the page and press **Tab** before interacting with the navigation.
-2. Confirm **Skip to main content** is the first focusable control; press **Enter** and confirm focus/navigation moves to the main content.
-3. Use a screen reader’s landmarks/regions list to locate the labeled section navigation, main content, chart groups, and shared status region.
+### Skip link and landmarks
+Press **Tab** on load: **Skip to main content** is first. Landmarks: section navigation (active link has `aria-current`), main, labelled chart groups, polite status region.
 
 ### Screen-reader chart tables
-
-There are six charts: Q1, Q2, Q3, Q4, Q5 age, and Q5 remoteness. Each chart container includes a visually hidden HTML table with a caption, column headers, and row headers.
-
-1. Use a screen reader’s table navigation to find each chart’s table and move through its rows and columns.
-2. Change Q1’s year/period and verify the table contains only the active year/range.
-3. Change Q2’s sort and measure and verify the table order/data follows the chart.
-4. Confirm Q4 and Q5 remoteness tables include a national-average reference row.
+Every chart has a visually hidden table (caption, column and row headers) that follows the current filters and sort. Q4 and Q5 tables include the reference row.
 
 ### Keyboard chart navigation
-
-1. Tab to a chart mark. One mark per keyboard-navigation set is in the Tab order; each SVG is labeled as a group and describes the arrow-key help.
-2. Press **Arrow Up**, **Arrow Down**, **Arrow Left**, or **Arrow Right** to move focus to the nearest mark in that direction. Press **Tab** to leave the chart.
-3. In Q3, use the keyboard-accessible road-user row target and press **Enter** or **Space** to open its breakdown; use the close button to dismiss it.
-4. Focus Q1’s filter and moving-average checkbox and the Q2/Q4/Q5 toggles with **Tab** and operate them with the standard select/checkbox/button keys. Verify the shared polite status region announces the changes.
+Tab to a chart mark (one per chart is in the Tab order), then use the arrow keys to move to the nearest mark; Tab leaves the chart. Each mark has `role="img"` and a full text label. In Q3, Enter/Space on a road user opens its breakdown.
 
 ### Audio narration
-
-Each question card has a labeled narration control group. Narration combines the card heading, chart descriptions, available Q1 KPI, and explanatory notes into a concise spoken summary.
-
-1. Activate **Listen to Summary**. The button changes to **Pause Summary**.
-2. Activate it again to pause; the label changes to **Resume Summary**. Activate again to resume.
-3. Activate **Stop** and confirm the control returns to **Listen to Summary**.
-4. Confirm the polite status region reports narration start, pause/resume, stop, completion, or an error. On a browser without `window.speechSynthesis` / `SpeechSynthesisUtterance`, narration is disabled with an accessible unavailable label.
+**Listen to Summary** reads the section heading, the description of each visible chart (generated from the data currently shown), the Q1 summary and the notes. Activate again to pause/resume; **Stop** ends it. Unsupported browsers show the button as unavailable.
 
 ### Mobile checks
-
-1. Use browser responsive tools at 390px and 599px viewport widths.
-2. Confirm the page itself does not scroll horizontally; use the chart’s own horizontal scroller to inspect the full-size SVG.
-3. Swipe the navbar and charts horizontally. Tap marks near the viewport edges and verify tooltips remain visible and can be dismissed with an outside tap.
-4. Confirm controls remain at least 44px high and Q3’s full-row touch targets open the correct details.
+At 390px and 599px: no horizontal page scroll, all chart labels readable without zooming, tooltips stay on screen and close with an outside tap.
 
 ## Implementation map
 
 | File | Feature areas |
 | --- | --- |
-| `index.html` | Q1 filter and moving-average controls; skip link and main target; question cards; shared polite status region; chart containers. |
-| `css/style.css` | Deep Spruce / Clay Pink / Taxi Yellow tokens; visually hidden content and focus indication; narration controls; touch targets; tooltip, navigation, and mobile chart behavior. Breakpoints: 768px and 599px. |
-| `js/common.js` | Labeled SVG groups; semantic data tables; arrow-key roving focus; viewport-clamped/touch-pinnable tooltips; toggle announcements; Web Speech narration; shared national-rate chart helper. |
-| `js/q1_trend.js` | Year/period selection, KPI, transitions, gradient area, crosshair, moving average, filtered table, and live announcements. |
-| `js/q2_road_users.js` | Independent measure and sort controls, animated bars, keyboard access, and dynamically sorted table. |
-| `js/q3_counterparty.js` | Stacked data table, keyboard-accessible segments and row targets, legend highlighting, detailed breakdown, and announcements. |
-| `js/q4_jurisdictions.js` | State/territory count-rate chart, national-average rate, and table configuration. |
-| `js/q5_age_remoteness.js` | Age chart table and keyboard access; remoteness count-rate chart and national-average reference. |
-
-## Running the page
-
-Serve the repository over HTTP rather than opening `index.html` directly, because the browser must fetch the CSV files. The [README](./README.md) includes the VS Code Live Server steps. The project currently uses manual browser checks rather than a configured automated test runner.
+| `index.html` | Guide-sign hero, chapter markers and key findings, filters and toggles, Q4 paired views, closing section, live region |
+| `css/style.css` | Palette tokens (incl. `--accent-strong`), focus and contrast styles, chart styles, breakpoints (768px, 599px) |
+| `js/common.js` | Responsive drawing, SVG/table helpers, arrow-key focus, tooltips, toggles and selects, optional-data loading via `data/manifest.json`, reporting-change notes, narration, linked highlighting, switchable bar chart |
+| `js/q1_trend.js` | Period filter, KPI, area, crosshair, moving average, annotations |
+| `js/q2_road_users.js` | Year comparison, diverging and dumbbell views, measure and sort controls |
+| `js/q3_counterparty.js` | Sankey and share-bar views, legend highlighting, breakdown panel, period filter |
+| `js/q4_jurisdictions.js` | Australia map (circles and choropleth), ranked bars, linked highlighting, year filter, all-states reference |
+| `js/q5_age_remoteness.js` | Variable-width age histogram, isotype remoteness chart, year filter, all-areas reference |
