@@ -1,0 +1,7 @@
+{ "optional": [
+  "q2_road_users_by_year.csv",
+  "q5_age_by_year.csv",
+  "q3_counterparty_by_year.csv",
+  "q4_jurisdictions_by_year.csv",
+  "q5_remoteness_by_year.csv"
+] }

@@ -1,19 +1,61 @@
 // Shared helpers used by every chart (loaded before the chart files).
-// Keeping these in one place avoids repeating the same code five times.
+// Keeping these in one place avoids repeating the same code in each question file.
 
 const DV = (() => {
   const tooltip = d3.select("#tooltip");
   const fmtInt = d3.format(",");
   const fmt1 = d3.format(",.1f");
+  // Compact numbers for narrow screens, e.g. 13,026 -> "13.0k".
+  const fmtCompact = v => (Math.abs(v) >= 10000 ? d3.format(".3s")(v) : fmtInt(v));
   let pinnedTooltipTarget = null;
+
+  // Below this chart width, charts switch to their phone layout (labels above bars, fewer ticks).
+  const NARROW = 560;
 
   // Respect users who ask their operating system for reduced motion.
   const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 600;
 
+  // Pick dark or white text so labels on coloured shapes keep at least 4.5:1 contrast.
+  function textOn(color) {
+    return d3.lab(color).l > 58 ? "#102420" : "#ffffff";
+  }
+
+  // Draw a chart at the real width of its container and redraw it when that width changes.
+  // draw(width, narrow) must build the whole SVG from the module's current state.
+  function responsive(selector, draw) {
+    const node = document.querySelector(selector);
+    if (!node) throw new Error(`Chart container not found: ${selector}`);
+    let lastWidth = 0;
+    let timer = null;
+
+    function render(force) {
+      if (!node.clientWidth) return; // hidden containers are drawn when they become visible
+      const style = getComputedStyle(node);
+      const width = Math.max(260, Math.floor(
+        node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+      ));
+      if (!force && Math.abs(width - lastWidth) < 8) return;
+      lastWidth = width;
+      d3.select(node).selectAll("svg").remove();
+      draw(width, width < NARROW);
+    }
+
+    render(true);
+    if ("ResizeObserver" in window) {
+      new ResizeObserver(() => {
+        clearTimeout(timer);
+        timer = setTimeout(() => render(false), 150);
+      }).observe(node);
+    }
+    return { redraw: () => render(true) };
+  }
+
   // Create a labeled SVG group, not an image, so its focusable data marks remain available to assistive technology.
   function createSvg(selector, width, height, margin, ariaLabel) {
-    const svg = d3.select(selector).append("svg")
+    const svg = d3.select(selector).insert("svg", ":first-child")
       .attr("viewBox", `0 0 ${width} ${height}`)
+      .attr("width", width)
+      .attr("height", height)
       .attr("role", "group")
       .attr("aria-label", ariaLabel);
     const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
@@ -91,11 +133,7 @@ const DV = (() => {
       const candidates = selection.nodes().filter(node => node !== this && node.isConnected)
         .map(node => {
           const box = node.getBoundingClientRect();
-          return {
-            node,
-            x: box.left + box.width / 2,
-            y: box.top + box.height / 2
-          };
+          return { node, x: box.left + box.width / 2, y: box.top + box.height / 2 };
         })
         .filter(point => (point[direction.axis] - current[direction.axis]) * direction.sign > 0)
         .sort((a, b) => {
@@ -160,8 +198,10 @@ const DV = (() => {
 
   // Tooltips work on hover and keyboard focus; touch taps pin them until another tap.
   // htmlFn builds the tooltip content; textFn gives a plain-text label for screen readers.
+  // Marks get role="img" (unless they already have a role, e.g. "button") so their aria-label is announced.
   function addTooltip(selection, htmlFn, textFn) {
     selection
+      .attr("role", function () { return this.getAttribute("role") || "img"; })
       .attr("tabindex", 0)
       .attr("aria-label", d => textFn(d))
       .on("mouseenter.tooltip focus.tooltip", (event, d) => {
@@ -184,13 +224,109 @@ const DV = (() => {
   function setupToggle(groupSelector, onChange) {
     const buttons = d3.selectAll(`${groupSelector} button`);
     const group = document.querySelector(groupSelector);
-    buttons.on("click", function () {
+    buttons.on("click.toggle", function () {
       buttons.attr("aria-pressed", "false");
       d3.select(this).attr("aria-pressed", "true");
       onChange(this.dataset.value);
       const groupLabel = group ? group.getAttribute("aria-label") : "Chart control";
       announce(`${groupLabel}: ${this.textContent.trim()}`);
     });
+  }
+
+  // Fill a <select> with options; hide its filter bar when there is nothing to choose.
+  function setupSelect(selectId, options, initial, onChange) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const wrapper = select.closest(".filter-group") || select.parentElement;
+    select.innerHTML = "";
+    options.forEach(option => {
+      const element = document.createElement("option");
+      element.value = option.value;
+      element.textContent = option.label;
+      select.append(element);
+    });
+    select.value = String(initial);
+    wrapper.hidden = options.length < 2;
+    // Hide the whole control panel if nothing in it is left to show (e.g. only one year of data).
+    const panel = select.closest(".controls");
+    if (panel) {
+      const visible = [...panel.children].some(child => child.classList.contains("filter-bar")
+        ? [...child.children].some(item => !item.hidden)
+        : !child.hidden);
+      panel.hidden = !visible;
+    }
+    select.addEventListener("change", () => onChange(select.value));
+  }
+
+  // Optional multi-year CSVs are listed in data/manifest.json once they are exported from KNIME.
+  // Unlisted files are not requested (so the console stays free of 404 errors) and the chart
+  // falls back to its single-period file.
+  const manifest = d3.json("data/manifest.json").catch(() => ({ optional: [] }));
+  // `columns` lists the exact header names the chart needs. If a listed file is missing a column,
+  // or a number column does not contain numbers, a clear warning is written to the browser console
+  // (F12) and the chart falls back to its single-period file instead of showing blank or "NaN" values.
+  function loadOptional(url, row, columns) {
+    const file = url.split("/").pop();
+    return manifest.then(m => {
+      if (!(m.optional || []).includes(file)) return null;
+      return d3.csv(url).then(raw => {
+        const missing = (columns || []).filter(c => !raw.columns.includes(c));
+        if (missing.length) {
+          console.warn(`${file}: missing column(s) ${missing.join(", ")}. Found: ${raw.columns.join(", ")}. Using the single-period file instead.`);
+          return null;
+        }
+        const rows = raw.map(row).filter(r => r != null); // a row function may return null to skip a row
+        const bad = rows.find(r => Object.values(r).some(v => typeof v === "number" && Number.isNaN(v)));
+        if (!rows.length || bad) {
+          console.warn(`${file}: some values are not numbers (check the year and count columns). Using the single-period file instead.`);
+          return null;
+        }
+        return rows;
+      }).catch(error => {
+        console.warn(`${file} could not be loaded (${error.message}). Using the single-period file instead.`);
+        return null;
+      });
+    });
+  }
+
+  // Period choices for the year filters: all years, the consistent 2017–2021 period, then single years.
+  function periodOptions(years) {
+    const options = [];
+    const first = d3.min(years);
+    const last = d3.max(years);
+    if (years.length > 1) options.push({ value: "all", label: `All years (${first}–${last})` });
+    const consistent = d3.range(2017, 2022).every(y => years.includes(y));
+    if (consistent && years.length > 5) options.push({ value: "2017-2021", label: "2017–2021 (consistent counting)" });
+    years.forEach(y => options.push({ value: String(y), label: String(y) }));
+    return options;
+  }
+  // The list of years a period value covers.
+  function periodYears(value, years) {
+    if (value === "all") return years;
+    const range = /^(\d{4})-(\d{4})$/.exec(value);
+    if (range) return years.filter(y => y >= +range[1] && y <= +range[2]);
+    return [+value];
+  }
+  // Text for a period value, e.g. "2021", "2017–2021" or "2011–2021".
+  function periodLabel(value, years) {
+    const list = periodYears(value, years);
+    return list.length > 1 ? `${d3.min(list)}–${d3.max(list)}` : String(list[0]);
+  }
+
+  // Note shown when a selected year or comparison crosses a reporting change.
+  function reportingCaveat(years) {
+    const min = d3.min(years);
+    const max = d3.max(years);
+    const notes = [];
+    if (min < 2012 && max >= 2012) notes.push("Victoria’s 2012 counting change");
+    if (min < 2017 && max >= 2017) notes.push("New South Wales’ 2017 counting change");
+    if (notes.length) {
+      return `Caution: this selection spans ${notes.join(" and ")}, so differences between years are partly due to counting, not real change. 2017–2021 is the first period counted the same way in every state.`;
+    }
+    if (max < 2017) {
+      return "Note: before 2017, New South Wales also counted cases treated only in emergency departments, so these years are not directly comparable with 2017 onwards.";
+    }
+    return "";
   }
 
   // Add play/pause and stop controls to every question card using the browser speech engine.
@@ -201,26 +337,23 @@ const DV = (() => {
     let activeUtterance = null;
     let activeControls = null;
 
-    // Build a short spoken summary from the heading, chart descriptions, current KPI, and notes.
+    // Build a short spoken summary from the heading, visible chart descriptions, current KPI, and notes.
     function buildSummary(card) {
+      const visible = element => !element.closest("[hidden]");
       const heading = card.querySelector("h2");
       const parts = [heading ? heading.textContent.trim() : ""];
       card.querySelectorAll(".chart svg[aria-label]").forEach(svg => {
-        parts.push(svg.getAttribute("aria-label"));
+        if (visible(svg)) parts.push(svg.getAttribute("aria-label"));
       });
       card.querySelectorAll(".q1-summary, .note").forEach(element => {
-        if (element.textContent.trim()) parts.push(element.textContent.trim());
+        if (visible(element) && element.textContent.trim()) parts.push(element.textContent.trim());
       });
       return parts.filter(Boolean).join(" ");
     }
 
     // Keep the main button label and stop button availability synchronized with speech state.
     function setNarrationState(controls, state) {
-      const labels = {
-        idle: "Listen to Summary",
-        speaking: "Pause Summary",
-        paused: "Resume Summary"
-      };
+      const labels = { idle: "Listen to Summary", speaking: "Pause Summary", paused: "Resume Summary" };
       controls.play.textContent = labels[state];
       controls.play.setAttribute("aria-label", `${labels[state]} for ${controls.title}`);
       controls.play.setAttribute("aria-pressed", String(state !== "idle"));
@@ -270,6 +403,7 @@ const DV = (() => {
         return;
       }
       const utterance = new SpeechUtterance(text);
+      utterance.lang = "en-AU";
       activeUtterance = utterance;
       activeControls = controls;
       utterance.onend = () => finishNarration(utterance, `${controls.title} summary finished.`);
@@ -331,109 +465,161 @@ const DV = (() => {
     return d3.sum(rows, d => d[countKey]) / population * 100000;
   }
 
-  // Horizontal bar chart that can switch between two measures (e.g. count vs rate)
-  // and optionally re-sort, so users can see how the ranking changes. A reference line
-  // can be configured for one measure (for example the national average on rate views).
-  // Used by Q4 (states) and Q5 (remoteness).
+  // Link marks that share a data-key inside one section (e.g. a state's map tile and its bar),
+  // so hovering or focusing one highlights the other: coordinated views.
+  function linkHighlights(sectionSelector) {
+    const section = document.querySelector(sectionSelector);
+    if (!section) return;
+    const set = key => section.querySelectorAll("[data-key]").forEach(el => {
+      el.classList.toggle("is-linked", key !== null && el.getAttribute("data-key") === key);
+    });
+    const handler = event => {
+      const target = event.target.closest && event.target.closest("[data-key]");
+      set(target ? target.getAttribute("data-key") : null);
+    };
+    section.addEventListener("mouseover", handler);
+    section.addEventListener("focusin", handler);
+    section.addEventListener("mouseleave", () => set(null));
+    section.addEventListener("focusout", event => {
+      if (!section.contains(event.relatedTarget)) set(null);
+    });
+  }
+
+  // Responsive horizontal bar chart that switches between two measures (e.g. count vs rate)
+  // and optionally re-sorts, so users can see how the ranking changes. A reference line
+  // can be shown for one measure. On narrow screens each label sits above its bar.
+  // Used by Q4 (states) and Q5 (remoteness). Returns a controller for filters and toggles.
   function switchableBarChart(cfg) {
-    const width = 860, height = cfg.height || 380;
-    const margin = { top: 10, right: 110, bottom: 50, left: cfg.leftMargin || 120 };
-    const { g, innerW, innerH } = createSvg(cfg.selector, width, height, margin, cfg.ariaLabel);
+    let data = cfg.data;
+    let measureKey = cfg.initial;
+    let reference = cfg.referenceLine || null;
+    let chart = null;
 
-    const x = d3.scaleLinear().range([0, innerW]);
-    const y = d3.scaleBand().range([0, innerH]).padding(0.25);
-    const xAxisG = g.append("g").attr("class", "axis").attr("transform", `translate(0,${innerH})`);
-    const yAxisG = g.append("g").attr("class", "axis axis-y");
-    const xLabel = g.append("text").attr("class", "axis-label")
-      .attr("x", innerW / 2).attr("y", innerH + 42).attr("text-anchor", "middle");
-    const referenceLine = g.append("line").attr("class", "reference-line").style("opacity", 0);
-    const referenceLabel = g.append("text").attr("class", "reference-label")
-      .attr("y", -2).style("opacity", 0);
+    function build(width, narrow) {
+      const n = data.length;
+      const rowH = 46;
+      const margin = narrow
+        ? { top: 24, right: 58, bottom: 48, left: 4 }
+        : { top: 24, right: 70, bottom: 50, left: cfg.leftMargin || 120 };
+      const height = narrow ? n * rowH + margin.top + margin.bottom : (cfg.height || 380);
+      const { svg, g, innerW, innerH } = createSvg(cfg.selector, width, height, margin, "");
 
-    // Redraw the axes, bars, value labels, and optional benchmark for the active measure.
-    function update(measureKey) {
-      const m = cfg.measures[measureKey];
-      const rows = cfg.sort === false
-        ? cfg.data
-        : [...cfg.data].sort((a, b) => d3.descending(a[m.key], b[m.key]));
+      const x = d3.scaleLinear().range([0, innerW]);
+      const y = d3.scaleBand().range([0, innerH]).padding(narrow ? 0 : 0.25);
+      const xAxisG = g.append("g").attr("class", "axis").attr("transform", `translate(0,${innerH})`);
+      const yAxisG = g.append("g").attr("class", "axis axis-y");
+      const xLabel = g.append("text").attr("class", "axis-label")
+        .attr("x", innerW / 2).attr("y", innerH + 40).attr("text-anchor", "middle");
+      const referenceLine = g.append("line").attr("class", "reference-line").style("opacity", 0);
+      const referenceLabel = g.append("text").attr("class", "reference-label").attr("y", -10).style("opacity", 0);
+      const nameLabel = cfg.nameLabel || (name => name);
+      const barY = d => narrow ? y(d[cfg.nameKey]) + 20 : y(d[cfg.nameKey]);
+      const barH = () => narrow ? 18 : y.bandwidth();
 
-      x.domain([0, d3.max(cfg.data, d => d[m.key])]).nice();
-      y.domain(rows.map(d => d[cfg.nameKey]));
+      // Redraw the axes, bars, value labels, and optional benchmark for the active measure.
+      function update(animate) {
+        const t = animate ? duration : 0;
+        const m = cfg.measures[measureKey];
+        const rows = cfg.sort === false
+          ? data
+          : [...data].sort((a, b) => d3.descending(a[m.key], b[m.key]));
 
-      xAxisG.transition().duration(duration).call(d3.axisBottom(x).ticks(5).tickFormat(m.axisFormat));
-      yAxisG.transition().duration(duration)
-        .call(d3.axisLeft(y).tickSize(0).tickPadding(8).tickFormat(cfg.nameLabel || (n => n)));
-      xLabel.text(m.label);
+        x.domain([0, d3.max(data, d => d[m.key])]).nice();
+        y.domain(rows.map(d => d[cfg.nameKey]));
+        svg.attr("aria-label", typeof cfg.ariaLabel === "function" ? cfg.ariaLabel(rows, measureKey) : cfg.ariaLabel);
 
-      const bars = g.selectAll(".bar").data(rows, d => d[cfg.nameKey])
-        .join(
-          enter => enter.append("rect").attr("class", "bar")
-            .attr("x", d => x(Math.min(0, d[m.key])))
-            .attr("y", d => y(d[cfg.nameKey])).attr("height", y.bandwidth())
-            .attr("width", 0).style("opacity", 0),
-          update => update,
-          exit => exit.transition().duration(duration).style("opacity", 0).remove()
-        )
-        .attr("fill", d => (cfg.highlight && cfg.highlight(d)) ? "var(--caveat)" : "var(--line)");
-      addTooltip(bars, cfg.tooltipHtml, d => cfg.tooltipText(d));
-      enableArrowNavigation(bars);
-      bars.transition().duration(duration).delay(duration ? (d, i) => i * 30 : 0)
-        .attr("y", d => y(d[cfg.nameKey]))
-        .attr("height", y.bandwidth())
-        .attr("x", d => x(Math.min(0, d[m.key])))
-        .attr("width", d => Math.abs(x(d[m.key]) - x(0)))
-        .style("opacity", 1);
-
-      const values = g.selectAll(".value").data(rows, d => d[cfg.nameKey])
-        .join(
-          enter => enter.append("text").attr("class", "value").style("opacity", 0),
-          update => update,
-          exit => exit.transition().duration(duration).style("opacity", 0).remove()
-        );
-      values.transition().duration(duration).delay(duration ? (d, i) => i * 30 : 0)
-        .attr("x", d => x(d[m.key]) + 6)
-        .attr("y", d => y(d[cfg.nameKey]) + y.bandwidth() / 2)
-        .attr("dy", "0.35em")
-        .text(d => m.format(d[m.key]))
-        .style("opacity", 1);
-
-      const benchmark = cfg.referenceLine && cfg.referenceLine.measureKey === measureKey
-        ? cfg.referenceLine
-        : null;
-      referenceLine.raise().interrupt().transition().duration(duration)
-        .attr("x1", benchmark ? x(benchmark.value) : 0)
-        .attr("x2", benchmark ? x(benchmark.value) : 0)
-        .attr("y1", 0).attr("y2", innerH)
-        .style("opacity", benchmark ? 1 : 0);
-      referenceLabel.raise().interrupt().transition().duration(duration)
-        .attr("x", benchmark
-          ? x(benchmark.value) + (x(benchmark.value) > innerW - 150 ? -5 : 5)
-          : 0)
-        .attr("text-anchor", benchmark && x(benchmark.value) > innerW - 150 ? "end" : "start")
-        .text(benchmark ? `${benchmark.label}: ${m.format(benchmark.value)}` : "")
-        .style("opacity", benchmark ? 1 : 0);
-
-      if (cfg.tableColumns) {
-        const tableRows = [...rows];
-        if (cfg.referenceLine) {
-          const referenceRow = {
-            [cfg.nameKey]: `${cfg.referenceLine.label} reference`
-          };
-          const referenceDataKey = cfg.measures[cfg.referenceLine.measureKey].key;
-          referenceRow[referenceDataKey] = cfg.referenceLine.value;
-          tableRows.push(referenceRow);
+        xAxisG.transition().duration(t).call(d3.axisBottom(x).ticks(narrow ? 3 : 5).tickFormat(m.axisFormat));
+        if (narrow) {
+          yAxisG.selectAll("*").remove();
+          g.selectAll(".bar-label").data(rows, d => d[cfg.nameKey])
+            .join("text").attr("class", "bar-label")
+            .text(d => nameLabel(d[cfg.nameKey]))
+            .transition().duration(t)
+            .attr("x", 0).attr("y", d => y(d[cfg.nameKey]) + 14);
+        } else {
+          yAxisG.transition().duration(t)
+            .call(d3.axisLeft(y).tickSize(0).tickPadding(8).tickFormat(nameLabel));
         }
-        addDataTable(cfg.selector, cfg.tableCaption, cfg.tableColumns, tableRows);
+        xLabel.text(m.label);
+
+        const bars = g.selectAll(".bar").data(rows, d => d[cfg.nameKey])
+          .join(
+            enter => enter.append("rect").attr("class", "bar")
+              .attr("x", 0).attr("y", barY).attr("height", barH()).attr("width", 0),
+            update => update,
+            exit => exit.transition().duration(t).style("opacity", 0).remove()
+          )
+          .attr("data-key", d => d[cfg.nameKey])
+          .classed("bar-caveat", d => Boolean(cfg.highlight && cfg.highlight(d)))
+          .attr("fill", d => (cfg.highlight && cfg.highlight(d)) ? "var(--caveat)" : "var(--line)");
+        addTooltip(bars, cfg.tooltipHtml, d => cfg.tooltipText(d));
+        enableArrowNavigation(bars);
+        bars.transition().duration(t).delay(t ? (d, i) => i * 30 : 0)
+          .attr("y", barY).attr("height", barH())
+          .attr("x", 0)
+          .attr("width", d => Math.max(0, x(d[m.key])))
+          .style("opacity", 1);
+
+        g.selectAll(".value").data(rows, d => d[cfg.nameKey])
+          .join("text").attr("class", "value")
+          .transition().duration(t).delay(t ? (d, i) => i * 30 : 0)
+          .attr("x", d => x(d[m.key]) + 6)
+          .attr("y", d => barY(d) + barH() / 2)
+          .attr("dy", "0.35em")
+          .text(d => narrow ? (m.compactFormat || m.format)(d[m.key]) : m.format(d[m.key]));
+
+        const benchmark = reference && reference.measureKey === measureKey ? reference : null;
+        const refX = benchmark ? x(benchmark.value) : 0;
+        referenceLine.raise().interrupt().transition().duration(t)
+          .attr("x1", refX).attr("x2", refX).attr("y1", -4).attr("y2", innerH)
+          .style("opacity", benchmark ? 1 : 0);
+        referenceLabel.raise().interrupt().transition().duration(t)
+          .attr("x", refX > innerW * 0.6 ? refX - 5 : refX + 5)
+          .attr("text-anchor", refX > innerW * 0.6 ? "end" : "start")
+          .text(benchmark ? `${benchmark.label}: ${m.format(benchmark.value)}` : "")
+          .style("opacity", benchmark ? 1 : 0);
+
+        if (cfg.tableColumns) {
+          const tableRows = [...rows];
+          if (reference) {
+            const referenceRow = { [cfg.nameKey]: `${reference.label} (reference)` };
+            referenceRow[cfg.measures[reference.measureKey].key] = reference.value;
+            tableRows.push(referenceRow);
+          }
+          addDataTable(cfg.selector, typeof cfg.tableCaption === "function" ? cfg.tableCaption() : cfg.tableCaption,
+            cfg.tableColumns, tableRows);
+        }
       }
+      return { update };
     }
 
-    update(cfg.initial);
-    setupToggle(cfg.toggleSelector, update);
+    responsive(cfg.selector, (width, narrow) => {
+      chart = build(width, narrow);
+      chart.update(false);
+    });
+    if (cfg.toggleSelector) {
+      setupToggle(cfg.toggleSelector, key => {
+        measureKey = key;
+        if (chart) chart.update(true);
+      });
+    }
+
+    return {
+      setMeasure(key) { measureKey = key; if (chart) chart.update(true); },
+      setData(rows, newReference) {
+        data = rows;
+        if (newReference) reference = newReference;
+        if (chart) chart.update(true);
+      },
+      get measure() { return measureKey; }
+    };
   }
 
   return {
-    fmtInt, fmt1, duration, createSvg, addDataTable, enableArrowNavigation,
-    addTooltip, setupToggle, announce, setupNarrationControls, weightedRate, switchableBarChart
+    fmtInt, fmt1, fmtCompact, duration, NARROW, textOn, responsive, createSvg, addDataTable,
+    enableArrowNavigation, addTooltip, setupToggle, setupSelect, loadOptional, reportingCaveat,
+    periodOptions, periodYears, periodLabel,
+    announce, setupNarrationControls, weightedRate, linkHighlights, switchableBarChart
   };
 })();
 
@@ -443,37 +629,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const navLinks = document.querySelectorAll(".nav-link");
   const progressBar = document.getElementById("scrollProgress");
 
-  // 1. Highlight active section in navbar on scroll
-  const observerOptions = {
-    root: null,
-    // Triggers when a section crosses the upper-middle portion of the viewport
-    rootMargin: "-20% 0px -65% 0px",
-    threshold: 0
-  };
-
+  // 1. Highlight the active section in the navbar on scroll.
   const sectionObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
         const currentId = entry.target.getAttribute("id");
         navLinks.forEach((link) => {
-          link.classList.toggle(
-            "active",
-            link.getAttribute("href") === `#${currentId}`
-          );
+          const isActive = link.getAttribute("href") === `#${currentId}`;
+          link.classList.toggle("active", isActive);
+          if (isActive) link.setAttribute("aria-current", "true");
+          else link.removeAttribute("aria-current");
         });
       }
     });
-  }, observerOptions);
+  }, { root: null, rootMargin: "-20% 0px -65% 0px", threshold: 0 });
 
   sections.forEach((section) => sectionObserver.observe(section));
 
-  // 2. Update bottom progress bar
+  // 2. Update the reading progress bar.
   window.addEventListener("scroll", () => {
     const scrollTop = window.scrollY;
     const docHeight = document.documentElement.scrollHeight - window.innerHeight;
     const scrollPercent = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
-    if (progressBar) {
-      progressBar.style.width = `${scrollPercent}%`;
-    }
+    if (progressBar) progressBar.style.width = `${scrollPercent}%`;
   }, { passive: true });
 });
