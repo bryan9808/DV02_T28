@@ -15,6 +15,37 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+.sr-only {
+  /* Fixed positioning prevents wide hidden data tables from expanding the mobile page. */
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.skip-link {
+  position: absolute;
+  z-index: 200;
+  top: .5rem;
+  left: .5rem;
+  padding: .65rem 1rem;
+  transform: translateY(-180%);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--ink);
+  font-weight: 700;
+}
+.skip-link:focus { transform: translateY(0); }
+
 html {
   scroll-behavior: smooth;
 }
@@ -49,6 +80,9 @@ body {
 }
 
 .nav-brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: #ffffff;
   font-weight: 800;
   font-size: 1.15rem;
@@ -68,8 +102,10 @@ body {
 }
 
 .nav-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   padding: 0.4rem 0.95rem;
+  min-height: 44px;
   border-radius: 999px;
   color: var(--surface);
   text-decoration: none;
@@ -149,6 +185,32 @@ h1 {
   color: var(--ink);
 }
 
+.narration-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  margin: -.25rem 0 1rem;
+}
+.narration-controls button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: .4rem .9rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: .9rem;
+  cursor: pointer;
+}
+.narration-controls button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  font-weight: 700;
+}
+.narration-controls button:disabled { opacity: .55; cursor: not-allowed; }
+
 .sub-block {
   margin-top: 1.75rem;
   padding-top: 1.25rem;
@@ -211,6 +273,7 @@ h1 {
 .toggle button, .legend button {
   font: inherit; font-size: .9rem;
   padding: .4rem .9rem;
+  min-width: 44px; min-height: 44px;
   border: 1px solid var(--surface-border);
   border-radius: 999px;
   background: #fff; color: var(--surface-text);
@@ -224,14 +287,90 @@ h1 {
 .legend button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: rgba(247, 184, 1, 0.1); }
 .swatch { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; margin-right: .4rem; vertical-align: -1px; }
 
+/* Q1 year/period filter and its live-updating total/change summary badge. */
+.q1-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .65rem;
+  margin: 0 0 .75rem;
+}
+.q1-filter-bar label { color: var(--ink); font-weight: 600; }
+.q1-filter-bar select {
+  font: inherit;
+  font-size: .9rem;
+  padding: .4rem .7rem;
+  min-height: 44px;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--surface-text);
+}
+.q1-ma-toggle { display: inline-flex; align-items: center; gap: .35rem; min-height: 44px; }
+.q1-ma-toggle input { accent-color: var(--line); }
+.q1-summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.15rem;
+  padding: .35rem .8rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: rgba(247, 184, 1, 0.2);
+  color: var(--ink);
+  font-size: .9rem;
+  font-weight: 600;
+}
+.control-label { align-self: center; color: var(--muted); font-size: .9rem; }
+.chart-interaction { fill: transparent; pointer-events: all; }
+.crosshair { pointer-events: none; }
+.crosshair line { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.crosshair circle { fill: var(--accent); stroke: var(--line); stroke-width: 2; }
+.crosshair text { fill: var(--ink); font-size: 12px; font-weight: 700; }
+.moving-average { fill: none; stroke: var(--accent); stroke-width: 3; stroke-dasharray: 8 4; pointer-events: none; }
+.reference-line { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 4; pointer-events: none; }
+.reference-label { fill: var(--ink); font-size: 11px; font-weight: 700; pointer-events: none; }
+.seg { cursor: pointer; }
+.road-user-hit { fill: transparent; pointer-events: none; cursor: pointer; }
+.seg:focus { outline: none; stroke: var(--accent); stroke-width: 2.5; }
+.detail-card {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--surface-border);
+  border-left: 5px solid var(--accent);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(16, 36, 32, 0.08);
+}
+.detail-card[hidden] { display: none; }
+.detail-card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.detail-card h3 { margin: 0; color: var(--ink); font-size: 1.1rem; }
+.detail-card p { margin: .2rem 0 .75rem; color: var(--muted); font-size: .9rem; }
+.detail-card button {
+  font: inherit; font-size: .85rem;
+  padding: .3rem .7rem;
+  min-width: 44px; min-height: 44px;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.detail-table-wrap { overflow-x: auto; }
+.detail-card table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.detail-card th, .detail-card td { padding: .45rem .55rem; border-bottom: 1px solid var(--grid); text-align: left; }
+.detail-card th:not(:first-child), .detail-card td:not(:first-child) { text-align: right; white-space: nowrap; }
+.detail-card th { color: var(--muted); font-weight: 700; }
+button { min-width: 44px; min-height: 44px; }
+
 /* Visible keyboard focus everywhere */
-button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .chart [tabindex]:focus { outline: none; stroke: var(--accent); stroke-width: 2.5; }
 
 .tooltip {
-  position: absolute; z-index: 10;
+  position: fixed; z-index: 110;
   pointer-events: none;
-  max-width: 260px;
+  max-width: min(260px, calc(100vw - 16px));
+  overflow-wrap: anywhere;
   background: var(--ink); color: #fff;
   padding: .45rem .65rem;
   border-radius: 6px;
@@ -241,6 +380,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 }
 .tip-muted { color: var(--caveat); }
 
+/* Tablet breakpoint: stack navigation and give dense chart labels more breathing room. */
 @media (max-width: 768px) {
   .nav-inner {
     padding: 0.75rem 1rem;
@@ -256,4 +396,41 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     padding: 1.5rem 1rem;
   }
   .axis-y text { font-size: 15px; }
+}
+
+/* Under 600px, keep the sticky navigation in a swipeable row and preserve chart text size. */
+@media (max-width: 599px) {
+  .nav-inner {
+    padding: .5rem .75rem;
+    gap: .25rem;
+  }
+  .nav-brand { font-size: 1rem; }
+  .nav-links {
+    width: 100%;
+    gap: .2rem;
+    padding: 0 .1rem .25rem;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+  }
+  .nav-links li { flex: 0 0 auto; scroll-snap-align: start; }
+  .nav-link { padding: .4rem .75rem; }
+  .chart {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+    padding: .8rem;
+  }
+  .chart svg {
+    width: 860px;
+    max-width: none;
+  }
+  /* Use the full 44px+ road-user row as Q3's touch target instead of narrow stack segments. */
+  #q3 .seg { pointer-events: none; }
+  #q3 .road-user-hit { pointer-events: all; }
+  .q1-filter-bar select { width: 100%; }
+  .q1-summary { max-width: 100%; white-space: normal; border-radius: 10px; }
 }

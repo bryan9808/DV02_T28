@@ -30,6 +30,13 @@
       DV.addTooltip(bars,
         d => `<strong>Age ${d.age}</strong><br>${DV.fmtInt(d.count)} hospitalisations${bandYears[d.age] ? `<br><span class="tip-muted">This group covers ${bandYears[d.age]} years of age</span>` : ""}`,
         d => `Age ${d.age}: ${DV.fmtInt(d.count)} hospitalisations`);
+      // Each age bar participates in roving arrow-key focus and has a corresponding hidden table row.
+      DV.enableArrowNavigation(bars);
+      DV.addDataTable("#q5-age", "2021 hospitalisations by age group", [
+        { label: "Age group", key: "age" },
+        { label: "Hospitalisations", value: d => DV.fmtInt(d.count) },
+        { label: "Age-band width in years", value: d => bandYears[d.age] || "Not specified" }
+      ], data);
 
       g.selectAll(".value").data(data).join("text").attr("class", "value")
         .attr("x", d => x(d.age) + x.bandwidth() / 2).attr("y", d => y(d.count) - 6)
@@ -38,12 +45,28 @@
 })();
 
 // Part B: remoteness (same switchable chart as Q4, kept in Major → Regional → Remote order)
-d3.csv("data/q5_remoteness.csv", d => ({
-  area: d.remoteness, count: +d.hospitalisations, pop: +d.population, rate: +d.rate_per_100k
-})).then(data => {
+Promise.all([
+  d3.csv("data/q5_remoteness.csv", d => ({
+    area: d.remoteness, count: +d.hospitalisations, pop: +d.population, rate: +d.rate_per_100k
+  })),
+  d3.csv("data/q4_jurisdictions.csv", d => ({
+    count: +d.hospitalisations, pop: +d.population
+  }))
+]).then(([data, jurisdictions]) => {
+  // Reuse the jurisdiction-weighted national rate so both rate views share the same benchmark.
+  const nationalAverageRate = DV.weightedRate(jurisdictions, "count", "pop");
   DV.switchableBarChart({
     selector: "#q5-remote", toggleSelector: "#q5-toggle", data, nameKey: "area", initial: "count",
     height: 260, leftMargin: 110, sort: false,
+    // The accessible table stays in chart order and includes the national-rate reference line.
+    tableCaption: "2021 hospitalisations by remoteness, with the national-average rate reference",
+    tableColumns: [
+      { label: "Remoteness area", key: "area" },
+      { label: "Hospitalisations", value: d => d.count === undefined ? "" : DV.fmtInt(d.count) },
+      { label: "Population", value: d => d.pop === undefined ? "" : DV.fmtInt(d.pop) },
+      { label: "Rate per 100,000 people", value: d => DV.fmt1(d.rate) }
+    ],
+    referenceLine: { measureKey: "rate", value: nationalAverageRate, label: "National average" },
     ariaLabel: "Bar chart of 2021 road crash hospitalisations by remoteness of residence. Major Cities have the most cases (26,355) but the lowest rate (142 per 100,000); Remote areas have the fewest cases (1,114) but the highest rate (225 per 100,000).",
     measures: {
       count: { key: "count", label: "Hospitalisations, 2021", format: DV.fmtInt, axisFormat: DV.fmtInt },

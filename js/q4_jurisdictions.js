@@ -5,9 +5,20 @@
 d3.csv("data/q4_jurisdictions.csv", d => ({
   state: d.state, count: +d.hospitalisations, pop: +d.population, rate: +d.rate_per_100k
 })).then(data => {
+  // Use the population-weighted rate across all states and territories as the rate-view benchmark.
+  const nationalAverageRate = DV.weightedRate(data, "count", "pop");
   DV.switchableBarChart({
     selector: "#q4", toggleSelector: "#q4-toggle", data, nameKey: "state", initial: "count",
     height: 400, leftMargin: 70,
+    // Shared helper rebuilds this table with the active ranking and includes its benchmark row.
+    tableCaption: "2021 hospitalisations by state and territory, with the national-average rate reference",
+    tableColumns: [
+      { label: "State or territory", key: "state" },
+      { label: "Hospitalisations", value: d => d.count === undefined ? "" : DV.fmtInt(d.count) },
+      { label: "Population", value: d => d.pop === undefined ? "" : DV.fmtInt(d.pop) },
+      { label: "Rate per 100,000 people", value: d => DV.fmt1(d.rate) }
+    ],
+    referenceLine: { measureKey: "rate", value: nationalAverageRate, label: "National average" },
     ariaLabel: "Bar chart of 2021 road crash hospitalisations by state and territory. By count, Victoria is highest and the Northern Territory lowest; by rate per 100,000 people, the Northern Territory is highest (286) and New South Wales lowest (111).",
     nameLabel: s => s === "NSW" ? "NSW*" : s,
     highlight: d => d.state === "NSW",

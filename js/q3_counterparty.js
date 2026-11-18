@@ -37,6 +37,20 @@
       return row;
     });
 
+    // Expose every stacked segment as a row with its count and share in the screen-reader table.
+    const tableRows = rows.flatMap(row => groups.map(group => ({
+      road: row.road,
+      category: group.key,
+      count: row[`${group.key}_n`],
+      share: row[group.key]
+    })));
+    DV.addDataTable("#q3", "Hospitalisations by road user and counterparty group, 2017–2021", [
+      { label: "Road user", key: "road" },
+      { label: "Counterparty group", key: "category" },
+      { label: "Hospitalisations", value: d => DV.fmtInt(d.count) },
+      { label: "Share", value: d => `${DV.fmt1(d.share)}%` }
+    ], tableRows);
+
     const series = d3.stack().keys(groups.map(g => g.key))(rows);
     const x = d3.scaleLinear().domain([0, 100]).range([0, innerW]);
     const y = d3.scaleBand().domain(roads).range([0, innerH]).padding(0.3);
@@ -56,6 +70,53 @@
     DV.addTooltip(segs,
       d => `<strong>${d.v.data.road}</strong><br>${d.key}: ${DV.fmtInt(d.v.data[`${d.key}_n`])} of ${DV.fmtInt(d.v.data.total)} cases (${DV.fmt1(share(d))}%)`,
       d => `${d.v.data.road}, ${d.key}: ${DV.fmt1(share(d))} per cent`);
+    // Arrow keys navigate stack segments; the separate full-row button targets provide the same access by road user.
+    DV.enableArrowNavigation(segs);
+    const detailCard = d3.select("#q3-detail");
+    const detailTitle = d3.select("#q3-detail-title");
+    const detailTotal = d3.select("#q3-detail-total");
+    let selectedRoad = null;
+    let active = null;
+
+    // Display the complete raw counterparty count breakdown for the clicked road-user row.
+    function showBreakdown(road) {
+      selectedRoad = road;
+      const subset = raw.filter(d => d.road === road).sort((a, b) => d3.descending(a.count, b.count));
+      const total = d3.sum(subset, d => d.count);
+      detailTitle.text(`${road}: detailed breakdown`);
+      detailTotal.text(`${DV.fmtInt(total)} hospitalisations, 2017–2021`);
+      d3.select("#q3-detail-rows").selectAll("tr")
+        .data(subset, d => d.counterparty)
+        .join("tr")
+        .each(function (d) {
+          d3.select(this).selectAll("td")
+            .data([
+              d.counterparty,
+              DV.fmtInt(d.count),
+              `${DV.fmt1(d.count / total * 100)}%`
+            ])
+            .join("td").text(value => value);
+        });
+      detailCard.attr("hidden", null);
+      updateHighlights();
+      DV.announce(`${road} detailed breakdown shown.`);
+    }
+
+    // Hide the detail card and restore every road-user row to its current legend state.
+    function closeBreakdown() {
+      selectedRoad = null;
+      detailCard.attr("hidden", true);
+      updateHighlights();
+      DV.announce("Road-user breakdown closed.");
+    }
+
+    // Apply counterparty highlighting and road-user filtering without changing the stacked data.
+    function updateHighlights() {
+      layers.transition().duration(DV.duration)
+        .attr("opacity", s => !active || s.key === active ? 1 : 0.2);
+      segs.transition().duration(DV.duration)
+        .attr("opacity", d => !selectedRoad || d.v.data.road === selectedRoad ? 1 : 0.2);
+    }
 
     // Direct labels on segments wide enough to hold them.
     layers.selectAll("text").data(s => s.map(v => ({ key: s.key, v }))).join("text")
@@ -64,15 +125,38 @@
       .attr("dy", "0.35em").attr("text-anchor", "middle")
       .text(d => share(d) >= 8 ? `${Math.round(share(d))}%` : "");
 
+    // A full-row target is keyboard-accessible and provides a wide touch target on narrow screens.
+    const rowHitTargets = g.selectAll(".road-user-hit").data(rows, d => d.road)
+      .join("rect").attr("class", "road-user-hit")
+      .attr("x", 0).attr("y", d => y(d.road))
+      .attr("width", innerW).attr("height", y.bandwidth())
+      .attr("role", "button")
+      .attr("aria-label", d => `${d.road}; show its counterparty breakdown`)
+      .on("click", (event, d) => showBreakdown(d.road))
+      .on("keydown", (event, d) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          showBreakdown(d.road);
+        }
+      });
+    DV.addTooltip(rowHitTargets,
+      d => `<strong>${d.road}</strong><br>${DV.fmtInt(d.total)} hospitalisations<br>Click to view detailed breakdown`,
+      d => `${d.road}: ${DV.fmtInt(d.total)} hospitalisations, show counterparty breakdown`);
+    DV.enableArrowNavigation(rowHitTargets);
+
+    // Segments retain direct mouse selection on larger screens; narrow screens use the full-row target.
+    segs.on("click", (event, d) => showBreakdown(d.v.data.road));
+
     // Clickable legend: highlight one counterparty across all road users.
-    let active = null;
     const legend = d3.select("#q3-legend").selectAll("button").data(groups).join("button")
       .attr("type", "button").attr("aria-pressed", "false")
       .html(d => `<span class="swatch" style="background:${d.color}"></span>${d.key}`)
       .on("click", function (event, d) {
         active = active === d.key ? null : d.key;
         legend.attr("aria-pressed", gr => String(gr.key === active));
-        layers.transition().duration(DV.duration).attr("opacity", s => !active || s.key === active ? 1 : 0.2);
+        updateHighlights();
+        DV.announce(`Q3 counterparty highlight: ${active || "all groups"}.`);
       });
+    d3.select("#q3-detail-close").on("click", closeBreakdown);
   });
 })();

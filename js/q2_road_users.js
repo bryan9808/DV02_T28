@@ -26,6 +26,8 @@
     const zeroLine = g.append("line").attr("stroke", "var(--ink)");
     const xLabel = g.append("text").attr("class", "axis-label")
       .attr("x", innerW / 2).attr("y", innerH + 42).attr("text-anchor", "middle");
+    let measureKey = "abs";
+    let sortKey = "abs";
 
     const tipHtml = d => `<strong>${d.road}</strong><br>
       2017: ${DV.fmtInt(d.c17)} (${DV.fmt1(d.s17)}% of all)<br>
@@ -33,9 +35,11 @@
       Change: ${d3.format("+,")(d.abs)} (${d3.format("+.1f")(d.pct)}%)
       ${d.c17 < 1000 ? '<br><span class="tip-muted">Small group: per cent change can swing widely</span>' : ""}`;
 
+    // Reorder by the magnitude of the selected metric while retaining the chosen display measure.
     function update(key) {
-      const m = measures[key];
-      const rows = [...data].sort((a, b) => d3.descending(a[m.key], b[m.key]));
+      measureKey = key;
+      const m = measures[measureKey];
+      const rows = [...data].sort((a, b) => d3.descending(Math.abs(a[sortKey]), Math.abs(b[sortKey])));
       const maxAbs = d3.max(data, d => Math.abs(d[m.key]));
       // Symmetric domain so 0 sits in the middle and increases/decreases are comparable.
       x.domain([-maxAbs, maxAbs]).nice();
@@ -46,25 +50,54 @@
       zeroLine.attr("x1", x(0)).attr("x2", x(0)).attr("y1", 0).attr("y2", innerH);
       xLabel.text(m.label);
 
-      const bars = g.selectAll(".bar").data(rows, d => d.road).join("rect").attr("class", "bar");
+      const bars = g.selectAll(".bar").data(rows, d => d.road)
+        .join(
+          enter => enter.append("rect").attr("class", "bar")
+            .attr("x", d => x(Math.min(0, d[m.key])))
+            .attr("y", d => y(d.road)).attr("height", y.bandwidth())
+            .attr("width", 0).style("opacity", 0),
+          update => update
+        );
+      // One bar is in the Tab order; arrow keys move between marks, and the table follows this sort.
       DV.addTooltip(bars, tipHtml,
         d => `${d.road}: ${m.format(d[m.key])}, from ${DV.fmtInt(d.c17)} in 2017 to ${DV.fmtInt(d.c21)} in 2021`);
-      bars.transition().duration(DV.duration)
+      DV.enableArrowNavigation(bars);
+      bars.transition().duration(DV.duration).delay(DV.duration ? (d, i) => i * 30 : 0)
         .attr("y", d => y(d.road)).attr("height", y.bandwidth())
         .attr("x", d => x(Math.min(0, d[m.key])))
         .attr("width", d => Math.abs(x(d[m.key]) - x(0)))
+        .style("opacity", 1)
         // Two colours only: orange = more people hospitalised, blue = fewer.
         .attr("fill", d => d[m.key] > 0 ? "var(--accent)" : "var(--line)");
 
-      g.selectAll(".value").data(rows, d => d.road).join("text").attr("class", "value")
-        .transition().duration(DV.duration)
+      const values = g.selectAll(".value").data(rows, d => d.road)
+        .join(
+          enter => enter.append("text").attr("class", "value").style("opacity", 0),
+          update => update
+        );
+      values.transition().duration(DV.duration).delay(DV.duration ? (d, i) => i * 30 : 0)
         .attr("x", d => d[m.key] >= 0 ? x(d[m.key]) + 5 : x(d[m.key]) - 5)
         .attr("text-anchor", d => d[m.key] >= 0 ? "start" : "end")
         .attr("y", d => y(d.road) + y.bandwidth() / 2).attr("dy", "0.35em")
-        .text(d => m.format(d[m.key]));
+        .text(d => m.format(d[m.key]))
+        .style("opacity", 1);
+
+      DV.addDataTable("#q2", `Road-user change data, sorted by ${sortKey === "pct" ? "percentage" : "absolute"} change`, [
+        { label: "Road user", key: "road" },
+        { label: "2017 hospitalisations", value: d => DV.fmtInt(d.c17) },
+        { label: "2021 hospitalisations", value: d => DV.fmtInt(d.c21) },
+        { label: "Absolute change", value: d => d3.format("+,")(d.abs) },
+        { label: "Percentage change", value: d => `${d3.format("+.1f")(d.pct)}%` },
+        { label: "Share change", value: d => `${d3.format("+.1f")(d.pp)} percentage points` }
+      ], rows);
     }
 
     update("abs");
     DV.setupToggle("#q2-toggle", update);
+    // Keep measure selection independent while reranking by absolute or percentage change.
+    DV.setupToggle("#q2-sort", value => {
+      sortKey = value;
+      update(measureKey);
+    });
   });
 })();
